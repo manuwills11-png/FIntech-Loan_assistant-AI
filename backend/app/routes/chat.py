@@ -42,6 +42,7 @@ LANG_NAMES = {
     "en": "English", "hi": "Hindi", "ta": "Tamil", "te": "Telugu",
     "kn": "Kannada", "mr": "Marathi", "bn": "Bengali", "ml": "Malayalam",
     "gu": "Gujarati", "ur": "Urdu", "pa": "Punjabi", "as": "Assamese", "or": "Odia",
+    "kok": "Hindi", "mni": "Hindi", "ks": "Hindi",
 }
 
 # ── Tool schemas ───────────────────────────────────────────────────────────────
@@ -900,7 +901,11 @@ async def chat_voice(
     audio_bytes = await audio.read()
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Empty audio file.")
-    transcribed = speech_service.transcribe_audio(audio_bytes=audio_bytes, language_code=language)
+    transcribed = speech_service.transcribe_audio(
+        audio_bytes=audio_bytes,
+        language_code=language,
+        post_correct=False,
+    )
     if not transcribed:
         raise HTTPException(status_code=422, detail="Could not transcribe audio. Please speak clearly.")
     logger.info("Transcribed [%s]: %s", language, transcribed)
@@ -920,7 +925,9 @@ async def chat_voice(
         pass
 
     result = _process_chat(message=transcribed, language=language, history=history, return_audio=return_audio, ctx=ctx)
-    return JSONResponse({"transcribed_text": transcribed, **result.model_dump()})
+    payload = json.loads(result.model_dump_json())
+    payload["transcribed_text"] = transcribed
+    return JSONResponse(content=payload)
 
 
 # ── Negotiation endpoint ───────────────────────────────────────────────────────

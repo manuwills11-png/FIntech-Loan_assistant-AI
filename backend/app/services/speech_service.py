@@ -18,10 +18,12 @@ def transcribe_audio(
     audio_bytes: bytes,
     language_code: str = "en",
     encoding: str = "LINEAR16",
+    post_correct: bool = True,
 ) -> Optional[str]:
     """
-    Transcribe audio bytes to text using Groq Whisper API,
-    then post-correct with LLM for better accuracy on Indian languages.
+    Transcribe audio bytes to text using Groq Whisper API.
+    Optional LLM post-correction (extra Groq call) — disabled for /chat/voice to
+    avoid rate limits when the UI also runs many translation requests.
     """
     api_key = os.getenv("GROQ_API_KEY", "")
     if not api_key:
@@ -35,19 +37,29 @@ def transcribe_audio(
 
         lang = _simple_lang_code(language_code)
 
-        response = client.audio.transcriptions.create(
-            model="whisper-large-v3",
-            file=("audio.webm", audio_bytes, "audio/webm"),
-            language=lang,
-            prompt=_get_lang_prompt(lang),
-        )
+        def _whisper(whisper_lang: Optional[str]):
+            kwargs: dict = {
+                "model": "whisper-large-v3",
+                "file": ("audio.webm", audio_bytes, "audio/webm"),
+            }
+            if whisper_lang:
+                kwargs["language"] = whisper_lang
+                hint = _get_lang_prompt(whisper_lang)
+                if hint:
+                    kwargs["prompt"] = hint
+            return client.audio.transcriptions.create(**kwargs)
+
+        try:
+            response = _whisper(lang)
+        except Exception as first_exc:
+            logger.warning("Whisper with language=%s failed (%s); retrying without language hint", lang, first_exc)
+            response = _whisper(None)
 
         raw_text = response.text.strip() if response.text else None
         if not raw_text:
             return None
 
-        # Post-correct with LLM for non-English languages
-        if lang != "en":
+        if post_correct and lang != "en":
             raw_text = _correct_transcription(client, raw_text, lang)
 
         return raw_text

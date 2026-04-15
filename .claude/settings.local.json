@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python -c \"from app.main import app; print\\('App loaded OK'\\); print\\('Routes:', [r.path for r in app.routes]\\)\")",
+      "Bash(python -c ':*)",
+      "Bash(python -c \"from app.services.ai_service import generate_response; print\\('ai_service OK'\\)\")",
+      "Bash(python -c \"from app.main import app; print\\('All imports OK'\\)\")",
+      "Read(//c/Program Files/Tesseract-OCR/**)",
+      "Bash(mkdir -p c:/finedge-loan/backend)",
+      "Bash(cp -r c:/finedge-loan/app c:/finedge-loan/backend/)",
+      "Bash(cp -r c:/finedge-loan/ml c:/finedge-loan/backend/)",
+      "Bash(cp c:/finedge-loan/requirements.txt c:/finedge-loan/backend/)",
+      "Bash(cp c:/finedge-loan/start.py c:/finedge-loan/backend/)",
+      "Bash(cp c:/finedge-loan/.env c:/finedge-loan/backend/.env)",
+      "Bash(cp c:/finedge-loan/.gitignore c:/finedge-loan/backend/.gitignore)",
+      "Bash(rm -rf c:/finedge-loan/app c:/finedge-loan/ml)",
+      "Bash(rm c:/finedge-loan/requirements.txt c:/finedge-loan/start.py)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/health)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri http://localhost:8000/health -UseBasicParsing | Select-Object -ExpandProperty Content\")"
+    ]
+  }
+}

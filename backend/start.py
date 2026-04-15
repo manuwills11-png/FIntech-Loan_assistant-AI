@@ -14,6 +14,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Ensure UTF-8 encoding for stdout/stderr on Windows (avoids UnicodeEncodeError
+# when logging translated text containing non-Latin characters like Hindi).
+if sys.platform == "win32":
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 MODEL_PATH = Path("./ml/loan_risk_model.pkl")
 
 

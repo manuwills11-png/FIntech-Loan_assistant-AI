@@ -21,20 +21,32 @@ def transcribe_audio(
     post_correct: bool = True,
 ) -> Optional[str]:
     """
-    Transcribe audio bytes to text using Groq Whisper API.
-    Optional LLM post-correction (extra Groq call) — disabled for /chat/voice to
-    avoid rate limits when the UI also runs many translation requests.
+    Transcribe audio bytes to text.
+    Primary: Groq Whisper API.
+    Fallback: Gemini 2.0 Flash multimodal transcription.
     """
+    result = _transcribe_with_groq(audio_bytes, language_code, post_correct)
+    if result:
+        return result
+
+    logger.info("Groq transcription unavailable, trying Gemini fallback.")
+    return _transcribe_with_gemini(audio_bytes, language_code)
+
+
+def _transcribe_with_groq(
+    audio_bytes: bytes,
+    language_code: str = "en",
+    post_correct: bool = True,
+) -> Optional[str]:
+    """Transcribe using Groq Whisper API."""
     api_key = os.getenv("GROQ_API_KEY", "")
     if not api_key:
-        logger.warning("GROQ_API_KEY not set – cannot transcribe audio.")
         return None
 
     try:
         from groq import Groq  # type: ignore
 
         client = Groq(api_key=api_key)
-
         lang = _simple_lang_code(language_code)
 
         def _whisper(whisper_lang: Optional[str]):
@@ -52,7 +64,7 @@ def transcribe_audio(
         try:
             response = _whisper(lang)
         except Exception as first_exc:
-            logger.warning("Whisper with language=%s failed (%s); retrying without language hint", lang, first_exc)
+            logger.warning("Whisper lang=%s failed (%s); retrying without hint", lang, first_exc)
             response = _whisper(None)
 
         raw_text = response.text.strip() if response.text else None
@@ -65,7 +77,56 @@ def transcribe_audio(
         return raw_text
 
     except Exception as exc:
-        logger.error("Groq Whisper transcription failed: %s", exc)
+        logger.warning("Groq Whisper transcription failed: %s", exc)
+        return None
+
+
+def _transcribe_with_gemini(audio_bytes: bytes, language_code: str = "en") -> Optional[str]:
+    """Transcribe audio using Gemini 2.0 Flash multimodal capabilities."""
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        return None
+
+    try:
+        import google.generativeai as genai  # type: ignore
+
+        genai.configure(api_key=api_key)
+        # Try models in order until one works
+        _GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash"]
+        model = None
+        for _gm in _GEMINI_MODELS:
+            try:
+                _c = genai.GenerativeModel(_gm)
+                _c.generate_content("hi", generation_config={"max_output_tokens": 1})
+                model = _c
+                break
+            except Exception:
+                continue
+        if model is None:
+            logger.warning("All Gemini models are rate-limited for transcription.")
+            return None
+
+        lang = _simple_lang_code(language_code)
+        lang_names = {
+            "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "kn": "Kannada",
+            "ml": "Malayalam", "mr": "Marathi", "bn": "Bengali", "gu": "Gujarati",
+            "pa": "Punjabi", "ur": "Urdu", "as": "Assamese", "or": "Odia",
+        }
+        lang_name = lang_names.get(lang, "English")
+
+        response = model.generate_content([
+            (
+                f"Transcribe the spoken {lang_name} audio below. "
+                "Return ONLY the transcribed text, nothing else. "
+                "Do not add punctuation beyond what was spoken."
+            ),
+            {"mime_type": "audio/webm", "data": audio_bytes},
+        ])
+        text = (response.text or "").strip()
+        return text if text else None
+
+    except Exception as exc:
+        logger.error("Gemini transcription failed: %s", exc)
         return None
 
 

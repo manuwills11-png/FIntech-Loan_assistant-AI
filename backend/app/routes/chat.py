@@ -839,8 +839,127 @@ def _run_agent(
         return "Analysis complete. Please check the results on screen.", client_actions
 
     except Exception as exc:
-        logger.error("Agent loop failed: %s", exc)
-        return "Sorry, something went wrong. Please try again.", []
+        logger.error("Agent loop failed (Groq): %s", exc)
+        # Fall back to Gemini if Groq is unavailable / rate-limited
+        return _run_agent_gemini_fallback(message, history, language, ctx)
+
+
+# ── Gemini-safe system prompt (ASCII only, no tool instructions) ──────────────
+
+def _build_gemini_system_prompt(language: str, ctx: "UserFinancialContext | None" = None) -> str:
+    """
+    Lightweight system prompt for Gemini fallback.
+    Uses ASCII-only characters to avoid Gemini safety filter false positives
+    triggered by Unicode symbols (Rs., dashes, emoji) in the full prompt.
+    """
+    lang_name = LANG_NAMES.get(language, "English")
+
+    known_parts: list[str] = []
+    if ctx:
+        if ctx.monthly_income:            known_parts.append(f"monthly income Rs.{ctx.monthly_income:,.0f}")
+        if ctx.monthly_expenses:          known_parts.append(f"monthly expenses Rs.{ctx.monthly_expenses:,.0f}")
+        if ctx.existing_loans is not None: known_parts.append(f"existing loans Rs.{ctx.existing_loans:,.0f}")
+        if ctx.emi_amount is not None:    known_parts.append(f"current EMI Rs.{ctx.emi_amount:,.0f}")
+        if ctx.loan_amount_requested:     known_parts.append(f"loan needed Rs.{ctx.loan_amount_requested:,.0f}")
+        if ctx.loan_tenure_months:        known_parts.append(f"tenure {ctx.loan_tenure_months} months")
+        if ctx.cibil_score:               known_parts.append(f"CIBIL {ctx.cibil_score}")
+        if ctx.age:                       known_parts.append(f"age {ctx.age}")
+        if ctx.loan_purpose:              known_parts.append(f"loan type {ctx.loan_purpose}")
+        if ctx.employment_type:           known_parts.append(f"employment {ctx.employment_type}")
+        if ctx.risk_score is not None:    known_parts.append(f"risk score {ctx.risk_score:.0f}/100 ({ctx.risk_category})")
+
+    known_block = ""
+    if known_parts:
+        known_block = f"User profile already collected: {', '.join(known_parts)}. Do not ask for these again.\n"
+
+    return (
+        f"You are FinEdge, a helpful Indian loan advisor. "
+        f"Always respond in {lang_name}. "
+        f"Keep replies concise (2-3 sentences). "
+        f"Help users understand their loan eligibility, interest rates, EMI calculations, "
+        f"and how to improve their credit score. "
+        f"For Indian context: mention CIBIL score (300-900), "
+        f"Indian banks (SBI, HDFC, ICICI, etc.), and amounts in Indian Rupees (Rs.). "
+        f"{known_block}"
+        f"Be friendly, practical, and give actionable advice. "
+        f"Do not ask for information already provided."
+    )
+
+
+# ── Gemini fallback agent ─────────────────────────────────────────────────────
+
+def _run_agent_gemini_fallback(
+    message: str,
+    history: list[ChatMessage],
+    language: str,
+    ctx: "UserFinancialContext | None" = None,
+) -> tuple[str, list[dict]]:
+    """
+    Fallback chat using Google Gemini when Groq is unavailable or rate-limited.
+    Uses the same system prompt for consistent behaviour; no tool calls (no form
+    auto-fill), but provides full conversational financial guidance.
+    """
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        return (
+            "Our AI assistant is temporarily unavailable due to high demand. "
+            "Please try again in a few minutes.", []
+        )
+
+    try:
+        import google.generativeai as genai  # type: ignore
+
+        genai.configure(api_key=api_key)
+
+        # Try models in order until one works (free-tier quotas differ per model)
+        _GEMINI_MODELS = [
+            "gemini-2.5-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-flash-latest",
+        ]
+        gemini_model_obj = None
+        for _gm in _GEMINI_MODELS:
+            try:
+                _candidate = genai.GenerativeModel(
+                    _gm,
+                    system_instruction=_build_gemini_system_prompt(language, ctx),
+                )
+                # Lightweight probe to confirm quota is available
+                _candidate.generate_content("hi", generation_config={"max_output_tokens": 1})
+                gemini_model_obj = _candidate
+                logger.info("Gemini fallback using model: %s", _gm)
+                break
+            except Exception as _probe_err:
+                logger.warning("Gemini model %s unavailable: %s", _gm, _probe_err)
+
+        if gemini_model_obj is None:
+            return (
+                "Our AI assistant is temporarily at capacity. Please try again in a few minutes.", []
+            )
+        model = gemini_model_obj
+
+        # Build chat history in Gemini format (role must be "user" or "model")
+        chat_history: list[dict] = []
+        for msg in history[-8:]:
+            chat_history.append({
+                "role": "user" if msg.role == "user" else "model",
+                "parts": [msg.content],
+            })
+
+        chat = model.start_chat(history=chat_history)
+        response = chat.send_message(message)
+        reply = (response.text or "").strip()
+        if not reply:
+            return "I'm here to help! Please share your financial details.", []
+        return reply, []
+
+    except Exception as exc:
+        logger.error("Gemini fallback also failed: %s", exc)
+        return (
+            "Our AI assistant is temporarily unavailable. "
+            "Please try again in a few minutes.", []
+        )
 
 
 # ── Chat processing ───────────────────────────────────────────────────────────

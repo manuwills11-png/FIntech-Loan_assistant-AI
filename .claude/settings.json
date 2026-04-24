@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"http://localhost:8000/bank-rates?cibil_score=750&loan_amount=50000&loan_purpose=credit_score_improvement&tenure_months=30\" -w \"\\\\nHTTP_STATUS:%{http_code}\")",
+      "Bash(python -c \"import groq; print\\('groq ok'\\)\")",
+      "Bash(python -c \"import gtts; print\\('gtts ok'\\)\")",
+      "Bash(python -c \"import langdetect; print\\('langdetect ok'\\)\")",
+      "Bash(curl -s -X POST http://localhost:8000/chat -H 'Content-Type: application/json' -d '{\"message\":\"Hello\",\"language\":\"en\",\"conversation_history\":[],\"return_audio\":false}' -w '\\\\nHTTP_STATUS:%{http_code}')",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import google.generativeai as genai; print\\('gemini ok'\\)\")",
+      "Bash(python -c \"import openai; print\\('openai ok'\\)\")",
+      "Bash(curl -s -X POST http://localhost:8000/chat -H 'Content-Type: application/json' -d '{\"message\":\"I need a home loan of 50 lakh. My income is 80000 per month.\",\"language\":\"en\",\"conversation_history\":[],\"return_audio\":false}' -w '\\\\nHTTP_STATUS:%{http_code}')",
+      "Bash(curl -s -X POST http://localhost:8000/translate/batch -H 'Content-Type: application/json' -d '{\"texts\":[\"Hello\",\"Submit\",\"Dashboard\",\"Loan Risk\",\"Bank Rates\"],\"target_language\":\"hi\"}' -w '\\\\nHTTP:%{http_code}')",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(python start.py)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Backend healthy:', d['status']\\)\")",
+      "Bash(curl -s -X POST http://localhost:8000/chat -H 'Content-Type: application/json' -d '{\"message\":\"What loan can I get with 60000 income and 750 CIBIL score?\",\"language\":\"en\",\"conversation_history\":[],\"return_audio\":false}' -w '\\\\nHTTP:%{http_code}')",
+      "Bash(curl -s -X POST http://localhost:8000/translate/batch -H 'Content-Type: application/json' -d '{\"texts\":[\"Submit\",\"Loan Risk\",\"Bank Rates\",\"Dashboard\"],\"target_language\":\"hi\"}' -w '\\\\nHTTP:%{http_code}')",
+      "Bash(curl -s \"http://localhost:8000/bank-rates?cibil_score=750&loan_amount=500000&loan_purpose=personal&tenure_months=36\" -w \"\\\\nHTTP:%{http_code}\")",
+      "Bash(curl -s http://localhost:8000/set-reminder -w \"\\\\nHTTP:%{http_code}\")",
+      "Bash(curl -s -X DELETE \"http://localhost:8000/set-reminder/test-job-id\" -w \"\\\\nHTTP:%{http_code}\")",
+      "Bash(awk '{print $NF}')"
+    ]
+  }
+}

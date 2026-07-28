@@ -6,6 +6,8 @@ services:
     buildCommand: pip install -r requirements.txt && python ml/train_model.py
     startCommand: python start.py
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
@@ -14,15 +16,18 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
-      - key: WHATSAPP_ACCESS_TOKEN
+      - key: TWILIO_ACCOUNT_SID
         sync: false
-      - key: WHATSAPP_PHONE_NUMBER_ID
+      - key: TWILIO_AUTH_TOKEN
         sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        value: whatsapp:+14155238886
+      - key: TWILIO_SANDBOX_WORD
+        sync: false
+      # Set this to your deployed Vercel frontend URL after the frontend is
+      # deployed, e.g. https://finedge-loan.vercel.app (comma-separate multiple
+      # origins if needed). Required — the backend no longer defaults to "*".
       - key: ALLOWED_ORIGINS
         sync: false
       - key: MODEL_PATH
         value: ./ml/loan_risk_model.pkl
-      - key: SCHEDULER_TIMEZONE
-        value: Asia/Kolkata
-      - key: APP_ENV
-        value: production

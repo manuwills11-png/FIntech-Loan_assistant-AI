@@ -73,12 +73,20 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-_allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "*")
-_allow_all = _allowed_origins_raw.strip() == "*"
-_allowed_origins = (
-    ["*"] if _allow_all
-    else [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]
-)
+# Production requires ALLOWED_ORIGINS to be set explicitly (comma-separated, e.g.
+# your Vercel URL). Never silently default to "*" — if unset, fall back to the
+# local Next.js dev server only, so the app is safe by default outside dev.
+_allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "").strip()
+if _allowed_origins_raw:
+    _allow_all = _allowed_origins_raw == "*"
+    _allowed_origins = (
+        ["*"] if _allow_all
+        else [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]
+    )
+else:
+    _allow_all = False
+    _allowed_origins = ["http://localhost:3000"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,

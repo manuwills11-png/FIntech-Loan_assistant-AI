@@ -7,7 +7,7 @@ services:
     startCommand: python start.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.12.4
+        value: 3.11.9
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
